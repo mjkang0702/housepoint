@@ -1,0 +1,66 @@
+package com.example.accordionapp.ui
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.accordionapp.data.AccordionRepository
+import com.example.accordionapp.model.AccordionItem
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import java.util.UUID
+import javax.inject.Inject
+
+@HiltViewModel
+class AccordionViewModel @Inject constructor(
+    private val accordionRepository: AccordionRepository
+) : ViewModel() {
+
+    private val _accordionItems = MutableStateFlow<Map<Int, List<AccordionItem>>>(emptyMap())
+    val accordionItems: StateFlow<Map<Int, List<AccordionItem>>> = _accordionItems
+
+    init {
+        viewModelScope.launch {
+            accordionRepository.initializeWithSampleData()
+
+            // Load data for all 6 pages
+            for (i in 0 until 6) {
+                loadPageData(i)
+            }
+        }
+    }
+
+    private fun loadPageData(pageIndex: Int) {
+        viewModelScope.launch {
+            accordionRepository.getPageData(pageIndex).collect { items ->
+                val currentMap = _accordionItems.value.toMutableMap()
+                currentMap[pageIndex] = items
+                _accordionItems.value = currentMap
+            }
+        }
+    }
+
+    fun addAccordionItem(
+        pageIndex: Int,
+        title: String,
+        content: String,
+        numericalValue: Double,
+        userId: String
+    ) {
+        viewModelScope.launch {
+            accordionRepository.addAccordionItem(pageIndex, title, content, numericalValue, userId)
+        }
+    }
+
+    fun updateAccordionItem(pageIndex: Int, item: AccordionItem, numericalValue: Double, userId: String) {
+        viewModelScope.launch {
+            accordionRepository.updateAccordionItem(pageIndex, item, numericalValue, userId)
+        }
+    }
+
+    fun deleteAccordionItem(pageIndex: Int, itemId: String) {
+        viewModelScope.launch {
+            accordionRepository.deleteAccordionItem(pageIndex, itemId)
+        }
+    }
+}

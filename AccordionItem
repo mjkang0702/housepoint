@@ -1,0 +1,16 @@
+package com.example.accordionapp.model
+
+import kotlinx.serialization.Serializable
+
+@Serializable
+// Update your AccordionItem model (in your model package)
+data class AccordionItem(
+    val id: String = "",
+    val title: String = "",
+    val content: String = "",
+    val numericalValue: Double = 0.0, // Add this new field
+    val createdBy: String = "",
+    val createdAt: Long = System.currentTimeMillis(),
+    val lastModifiedBy: String = "",
+    val lastModifiedAt: Long = System.currentTimeMillis()
+)

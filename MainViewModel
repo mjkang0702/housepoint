@@ -1,0 +1,62 @@
+package com.example.accordionapp.ui
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.accordionapp.data.UserRepository
+import com.example.accordionapp.model.User
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@HiltViewModel
+class MainViewModel @Inject constructor(
+    private val userRepository: UserRepository
+) : ViewModel() {
+
+    private val _currentUser = MutableStateFlow<User?>(null)
+    val currentUser: StateFlow<User?> = _currentUser
+
+    private val _isAuthenticated = MutableStateFlow(false)
+    val isAuthenticated: StateFlow<Boolean> = _isAuthenticated
+
+    private val _loginError = MutableStateFlow<String?>(null)
+    val loginError: StateFlow<String?> = _loginError
+
+    init {
+        viewModelScope.launch {
+            userRepository.currentUser.collectLatest { user ->
+                _currentUser.value = user
+                _isAuthenticated.value = user != null
+            }
+        }
+    }
+
+    fun login(username: String, password: String) {
+        viewModelScope.launch {
+            val success = userRepository.loginUser(username, password)
+            if (!success) {
+                _loginError.value = "Invalid username or password"
+            } else {
+                _loginError.value = null
+            }
+        }
+    }
+
+    fun logout() {
+        viewModelScope.launch {
+            userRepository.logoutUser()
+        }
+    }
+
+    fun canEditPage(pageIndex: Int): Boolean {
+        return userRepository.canUserEditPage(_currentUser.value, pageIndex)
+    }
+
+    fun getUserById(userId: String): User? {
+        return userRepository.getUserById(userId)
+    }
+}
+

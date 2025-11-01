@@ -1,0 +1,132 @@
+package com.example.accordionapp.data
+
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import com.example.accordionapp.model.AccordionItem
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import java.util.UUID
+import javax.inject.Inject
+import javax.inject.Singleton
+
+private val Context.accordionDataStore: DataStore<Preferences> by preferencesDataStore(name = "accordion_data")
+
+@Singleton
+class AccordionRepository @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
+    // Create a key for each page
+    private val pageKeys = List(6) { pageIndex ->
+        stringPreferencesKey("page_${pageIndex}_data")
+    }
+
+    // Get data for a specific page
+    fun getPageData(pageIndex: Int): Flow<List<AccordionItem>> {
+        return context.accordionDataStore.data.map { preferences ->
+            val jsonData = preferences[pageKeys[pageIndex]] ?: "[]"
+            try {
+                Json.decodeFromString(jsonData)
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }
+    }
+
+    // Add an item to a page
+    suspend fun addAccordionItem(pageIndex: Int, title: String, content: String, numericalValue: Double, userId: String) {
+        context.accordionDataStore.edit { preferences ->
+            val existingJson = preferences[pageKeys[pageIndex]] ?: "[]"
+            val existingItems: List<AccordionItem> = try {
+                Json.decodeFromString(existingJson)
+            } catch (e: Exception) {
+                emptyList()
+            }
+
+            val newItem = AccordionItem(
+                id = UUID.randomUUID().toString(),
+                title = title,
+                content = content,
+                numericalValue = numericalValue, // Now properly storing the numerical value
+                createdBy = userId,
+                lastModifiedBy = userId
+            )
+
+            val updatedItems = existingItems + newItem
+            preferences[pageKeys[pageIndex]] = Json.encodeToString(updatedItems)
+        }
+    }
+
+    // Update an item on a page
+    suspend fun updateAccordionItem(pageIndex: Int, updatedItem: AccordionItem, numericalValue: Double, userId: String) {
+        context.accordionDataStore.edit { preferences ->
+            val existingJson = preferences[pageKeys[pageIndex]] ?: "[]"
+            val existingItems: List<AccordionItem> = try {
+                Json.decodeFromString(existingJson)
+            } catch (e: Exception) {
+                emptyList()
+            }
+
+            val itemWithUpdates = updatedItem.copy(
+                numericalValue = numericalValue, // Update the numerical value
+                lastModifiedBy = userId
+            )
+
+            val updatedItems = existingItems.map {
+                if (it.id == updatedItem.id) itemWithUpdates else it
+            }
+
+            preferences[pageKeys[pageIndex]] = Json.encodeToString(updatedItems)
+        }
+    }
+
+    // Delete an item from a page
+    suspend fun deleteAccordionItem(pageIndex: Int, itemId: String) {
+        context.accordionDataStore.edit { preferences ->
+            val existingJson = preferences[pageKeys[pageIndex]] ?: "[]"
+            val existingItems: List<AccordionItem> = try {
+                Json.decodeFromString(existingJson)
+            } catch (e: Exception) {
+                emptyList()
+            }
+
+            val updatedItems = existingItems.filter { it.id != itemId }
+            preferences[pageKeys[pageIndex]] = Json.encodeToString(updatedItems)
+        }
+    }
+
+    // Initialize with sample data if needed
+    suspend fun initializeWithSampleData() {
+        // Initialize page 0 with sample data
+        context.accordionDataStore.edit { preferences ->
+            if (preferences[pageKeys[0]] == null) {
+                val sampleItems = listOf(
+                    AccordionItem(
+                        id = UUID.randomUUID().toString(),
+                        title = "Getting Started",
+                        content = "Welcome to the accordion app! This item demonstrates the accordion feature.",
+                        numericalValue = 100.0, // Added sample numerical value
+                        createdBy = "1",  // admin user
+                        lastModifiedBy = "1"
+                    ),
+                    AccordionItem(
+                        id = UUID.randomUUID().toString(),
+                        title = "Adding Items",
+                        content = "If you have the right permissions, you can add new items to this accordion.",
+                        numericalValue = 75.5, // Added sample numerical value
+                        createdBy = "1",
+                        lastModifiedBy = "1"
+                    )
+                )
+                preferences[pageKeys[0]] = Json.encodeToString(sampleItems)
+            }
+        }
+    }
+}
